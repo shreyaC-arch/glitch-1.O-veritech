@@ -1,1 +1,2 @@
-Fraud transaction detection
+This project, "Fraud Detection in Transactions," is an AI tool designed to identify and flag fraudulent digital payments. The core problem it solves is the difficulty of manually detecting fraud in a high volume of transactions.
+The project's Minimum Viable Product (MVP) is a script that analyzes a mock dataset, identifying and flagging transactions that stray from a simple, predefined pattern, such as being an unusually large amount. This demonstrates the tool's fundamental capability of anomaly detection. The goal is to build on this foundation by incorporating more advanced machine learning models in the future to detect more complex fraud patterns.Fraud transaction detection
