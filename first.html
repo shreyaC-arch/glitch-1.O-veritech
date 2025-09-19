@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fraud Detection Demo with Payment Slip Upload</title>
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background-color: #f8f9fa;
+    }
+    #resultCard {
+      border: 1px solid #e3e3e3;
+      background: #fff;
+    }
+    #resultCard.high { border-left: 6px solid #dc3545; }
+    #resultCard.medium { border-left: 6px solid #ffc107; }
+    #resultCard.low { border-left: 6px solid #28a745; }
+    #slipPreview {
+      max-width: 100%;
+      max-height: 300px;
+      border: 1px solid #ddd;
+      border-radius: .25rem;
+      margin-top: .5rem;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <div class="container">
+      <a class="navbar-brand" href="#">FraudDetect Demo</a>
+      <a class="nav-link text-light" href="http://127.0.0.1:5501/history.html">History</a>
+
+
+    </div>
+  </nav>
+
+  <main class="container my-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h4 class="card-title mb-3">Real-time Transaction Check</h4>
+
+            <form id="txnForm">
+              <div class="row">
+                <div class="mb-3 col-md-6">
+                  <label class="form-label">Transaction ID</label>
+                  <input type="text" id="transactionId" class="form-control" placeholder="txn_12345" required>
+                </div>
+                <div class="mb-3 col-md-6">
+                  <label class="form-label">User ID</label>
+                  <input type="text" id="userId" class="form-control" placeholder="user_001" required>
+                </div>
+
+                <div class="mb-3 col-md-4">
+                  <label class="form-label">Amount (₹)</label>
+                  <input type="number" id="amount" class="form-control" placeholder="500.00" required min="0" step="0.01">
+                </div>
+                <div class="mb-3 col-md-4">
+                  <label class="form-label">Channel</label>
+                  <select id="channel" class="form-select">
+                    <option value="card">Card</option>
+                    <option value="upi">UPI</option>
+                    <option value="netbanking">Netbanking</option>
+                    <option value="wallet">Wallet</option>
+                  </select>
+                </div>
+                <div class="mb-3 col-md-4">
+                  <label class="form-label">Merchant</label>
+                  <input type="text" id="merchant" class="form-control" placeholder="Merchant XYZ">
+                </div>
+
+                <div class="mb-3 col-md-6">
+                  <label class="form-label">Location (city, country)</label>
+                  <input type="text" id="location" class="form-control" placeholder="Mumbai, India">
+                </div>
+                <div class="mb-3 col-md-6">
+                  <label class="form-label">Device ID / IMEI</label>
+                  <input type="text" id="deviceId" class="form-control" placeholder="device_abc123">
+                </div>
+
+                <div class="mb-3 col-md-6">
+                  <label class="form-label">IP Address</label>
+                  <input type="text" id="ipAddress" class="form-control" placeholder="203.0.113.5">
+                </div>
+
+                <div class="mb-3 col-md-6">
+                  <label class="form-label">Timestamp</label>
+                  <input type="datetime-local" id="timestamp" class="form-control" required>
+                </div>
+
+                <!-- ✅ New Image Upload -->
+                <div class="mb-3 col-12">
+                  <label class="form-label">Upload Payment Slip (image/PDF)</label>
+                  <input type="file" id="paymentSlip" class="form-control"
+                         accept="image/*,application/pdf">
+                  <img id="slipPreview" alt="Slip preview" />
+                </div>
+              </div>
+
+              <div class="d-flex gap-2">
+                <button class="btn btn-primary" type="submit">Check Fraud</button>
+                <button class="btn btn-outline-secondary" type="button" id="sampleBtn">Fill Sample</button>
+                <button class="btn btn-outline-danger" type="reset">Reset</button>
+              </div>
+            </form>
+
+            <hr />
+
+            <div id="resultArea" class="mt-3" style="display:none;">
+              <h5>Detection Result</h5>
+              <div id="resultCard" class="p-3 rounded"></div>
+              <pre id="debug" class="mt-2 small"></pre>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="text-muted small mt-3">
+          Note: Image is only previewed on the client in this demo.  
+          Backend changes are needed to analyze uploaded files.
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Bootstrap JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+  const form = document.getElementById('txnForm');
+  const resultArea = document.getElementById('resultArea');
+  const resultCard = document.getElementById('resultCard');
+  const debug = document.getElementById('debug');
+  const sampleBtn = document.getElementById('sampleBtn');
+  const paymentSlip = document.getElementById('paymentSlip');
+  const slipPreview = document.getElementById('slipPreview');
+
+  // Show live preview of uploaded image
+  paymentSlip.addEventListener('change', () => {
+    const file = paymentSlip.files[0];
+    if (!file) { slipPreview.style.display = 'none'; return; }
+
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        slipPreview.src = e.target.result;
+        slipPreview.style.display = 'block';
+      };
+      reader.readAsDataURL(file);
+    } else {
+      slipPreview.style.display = 'none';
+    }
+  });
+
+  // Fill sample data quickly
+  sampleBtn.onclick = () => {
+    document.getElementById('transactionId').value = 'txn_' + Math.floor(Math.random() * 100000);
+    document.getElementById('userId').value = 'user_42';
+    document.getElementById('amount').value = '12500';
+    document.getElementById('channel').value = 'card';
+    document.getElementById('merchant').value = 'Luxury Store';
+    document.getElementById('location').value = 'Delhi, India';
+    document.getElementById('deviceId').value = 'device_new_999';
+    document.getElementById('ipAddress').value = '198.51.100.23';
+    const now = new Date();
+    const tzoffset = now.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(now - tzoffset)).toISOString().slice(0,16);
+    document.getElementById('timestamp').value = localISOTime;
+  };
+
+  // Submit to backend (transaction data only)
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const payload = {
+      transactionId: document.getElementById('transactionId').value,
+      userId: document.getElementById('userId').value,
+      amount: parseFloat(document.getElementById('amount').value),
+      channel: document.getElementById('channel').value,
+      merchant: document.getElementById('merchant').value,
+      location: document.getElementById('location').value,
+      deviceId: document.getElementById('deviceId').value,
+      ipAddress: document.getElementById('ipAddress').value,
+      timestamp: document.getElementById('timestamp').value
+    };
+
+    try {
+      const resp = await fetch('http://localhost:8080/api/detect', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+
+      if (!resp.ok) throw new Error('Network response was not ok: ' + resp.statusText);
+      const json = await resp.json();
+
+      resultArea.style.display = 'block';
+      resultCard.className = '';
+      resultCard.classList.add(
+        json.verdict === 'fraud' ? 'high' :
+        json.verdict === 'review' ? 'medium' : 'low'
+      );
+      resultCard.innerHTML = `
+        <p><strong>Verdict:</strong> ${json.verdict.toUpperCase()} 
+           (<strong>Risk Score:</strong> ${json.riskScore.toFixed(2)})</p>
+        <p><strong>Reason:</strong> ${json.reason}</p>
+      `;
+      debug.textContent = JSON.stringify(json.explain, null, 2);
+
+      /* ✅ SAVE TO LOCAL STORAGE for history.html */
+      const history = JSON.parse(localStorage.getItem('fraudHistory') || '[]');
+      history.unshift({
+        transactionId: payload.transactionId,
+        userId: payload.userId,
+        amount: payload.amount,
+        verdict: json.verdict,
+        riskScore: json.riskScore,
+        timestamp: payload.timestamp
+      });
+      localStorage.setItem('fraudHistory', JSON.stringify(history.slice(0, 100)));
+      /* ✅ END SAVE */
+
+    } catch (err) {
+      resultArea.style.display = 'block';
+      resultCard.className = '';
+      resultCard.innerHTML = `<div class="text-danger">Error: ${err.message}</div>`;
+      debug.textContent = '';
+    }
+  });
+</script>
+
+</body>
+</html>
